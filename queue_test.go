@@ -233,6 +233,10 @@ func ExampleQueue() {
 	fmt.Println("Dequeued:", item)
 
 	q.Enqueue("D")
+	fmt.Println("Resized:", q.Resize(4))
+	fmt.Println("Length:", q.Len())
+	fmt.Println("Capacity:", q.Cap())
+	q.Enqueue("E")
 
 	for q.Len() > 0 {
 		item, _ := q.Dequeue()
@@ -244,7 +248,11 @@ func ExampleQueue() {
 	// Capacity: 3
 	// Exceeded: queue is full
 	// Dequeued: A
+	// Resized: <nil>
+	// Length: 3
+	// Capacity: 4
 	// Dequeued: B
 	// Dequeued: C
 	// Dequeued: D
+	// Dequeued: E
 }
