@@ -15,16 +15,19 @@ var ErrQueueEmpty = errors.New("queue is empty")
 // ErrNewCapacityTooSmall is returned when an attempt is made to resize the queue to a capacity smaller than the current number of items.
 var ErrNewCapacityTooSmall = errors.New("new capacity is too small")
 
-// Queue represents a thread-safe FIFO queue with resizable capacity.
+// ErrQueueClosed is returned when an attempt is made to perform an operation on a closed queue.
+var ErrQueueClosed = errors.New("queue is closed")
+
+// Queue is a thread-safe FIFO queue with resizable capacity.
 type Queue[T any] struct {
-	muEnq sync.Mutex
-	muDeq sync.Mutex
-	cond  *sync.Cond
-	items []T
-	head  int
-	tail  int
-	len   int
-	cap   int
+	mu     sync.Mutex
+	cond   *sync.Cond
+	items  []T
+	head   int
+	tail   int
+	len    int
+	cap    int
+	closed bool
 }
 
 // New creates a new Queue with the given initial capacity.
@@ -33,31 +36,32 @@ func New[T any](initialCapacity int) *Queue[T] {
 		items: make([]T, initialCapacity),
 		cap:   initialCapacity,
 	}
-	q.cond = sync.NewCond(&sync.Mutex{})
+	q.cond = sync.NewCond(&q.mu)
 	return q
 }
 
-// Len returns the current number of items in the queue.
+// Len returns the number of items in the queue.
 func (q *Queue[T]) Len() int {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	return q.len
 }
 
 // Cap returns the current capacity of the queue.
 func (q *Queue[T]) Cap() int {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	return q.cap
 }
 
-// Enqueue adds an item to the queue. It returns an error if the queue is full.
+// Enqueue adds an item to the end of the queue. If the queue is full, ErrQueueFull is returned.
 func (q *Queue[T]) Enqueue(item T) error {
-	q.muEnq.Lock()
-	defer q.muEnq.Unlock()
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
+	if q.closed {
+		return ErrQueueClosed
+	}
 
 	if q.len == q.cap {
 		return ErrQueueFull
@@ -66,20 +70,24 @@ func (q *Queue[T]) Enqueue(item T) error {
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
-	q.cond.Signal()
+
+	if q.len == 1 {
+		q.cond.Signal() // Signal only when transitioning from empty to non-empty
+	}
 
 	return nil
 }
 
-// Dequeue removes and returns an item from the queue. It returns an error if the queue is empty.
+// Dequeue removes and returns the item at the front of the queue. If the queue is empty, ErrQueueEmpty is returned.
 func (q *Queue[T]) Dequeue() (T, error) {
-	q.muDeq.Lock()
-	defer q.muDeq.Unlock()
-
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
 	var zero T
+	if q.closed {
+		return zero, ErrQueueClosed
+	}
+
 	if q.len == 0 {
 		return zero, ErrQueueEmpty
 	}
@@ -88,55 +96,68 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	q.items[q.head] = zero // Clear the reference to allow garbage collection
 	q.head = (q.head + 1) % q.cap
 	q.len--
-	q.cond.Signal()
+
+	if q.len == q.cap-1 {
+		q.cond.Signal() // Signal only when transitioning from full to non-full
+	}
 
 	return item, nil
 }
 
-// BlockingEnqueue adds an item to the queue, blocking if the queue is full.
-func (q *Queue[T]) BlockingEnqueue(item T) {
-	q.muEnq.Lock()
-	defer q.muEnq.Unlock()
+// BlockingEnqueue adds an item to the end of the queue. If the queue is full, the calling goroutine is blocked until space becomes available.
+func (q *Queue[T]) BlockingEnqueue(item T) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
-
-	for q.len == q.cap {
+	for q.len == q.cap && !q.closed {
 		q.cond.Wait()
+	}
+
+	if q.closed {
+		return ErrQueueClosed
 	}
 
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
-	q.cond.Signal()
+
+	if q.len == 1 {
+		q.cond.Signal()
+	}
+
+	return nil
 }
 
-// BlockingDequeue removes and returns an item from the queue, blocking if the queue is empty.
-func (q *Queue[T]) BlockingDequeue() T {
-	q.muDeq.Lock()
-	defer q.muDeq.Unlock()
+// BlockingDequeue removes and returns the item at the front of the queue. If the queue is empty, the calling goroutine is blocked until an item becomes available.
+func (q *Queue[T]) BlockingDequeue() (T, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
-
-	for q.len == 0 {
+	for q.len == 0 && !q.closed {
 		q.cond.Wait()
 	}
 
 	var zero T
+	if q.closed {
+		return zero, ErrQueueClosed
+	}
+
 	item := q.items[q.head]
-	q.items[q.head] = zero // Clear the reference to allow garbage collection
+	q.items[q.head] = zero
 	q.head = (q.head + 1) % q.cap
 	q.len--
-	q.cond.Signal()
 
-	return item
+	if q.len == q.cap-1 {
+		q.cond.Signal()
+	}
+
+	return item, nil
 }
 
 // Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items.
 func (q *Queue[T]) Resize(newCap int) error {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
 	if newCap == q.cap {
 		return nil
@@ -162,5 +183,19 @@ func (q *Queue[T]) Resize(newCap int) error {
 	q.cap = newCap
 	q.cond.Broadcast()
 
+	return nil
+}
+
+// Close marks the queue as closed, preventing further enqueues.
+func (q *Queue[T]) Close() error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if q.closed {
+		return ErrQueueClosed
+	}
+
+	q.closed = true
+	q.cond.Broadcast()
 	return nil
 }

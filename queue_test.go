@@ -242,7 +242,7 @@ func TestQueue_Blocking(t *testing.T) {
 		item, err := q.Dequeue()
 		t.Logf("just dequeued %d -- %v", item, err)
 
-		item = q.BlockingDequeue()
+		item, _ = q.BlockingDequeue()
 		t.Logf("blocking dequeued %d", item)
 	}()
 
