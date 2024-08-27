@@ -368,6 +368,152 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	wg.Wait()
 }
 
+func TestQueue_EnqueueAfterClose(t *testing.T) {
+	q := New[int](3)
+	_ = q.Close()
+
+	err := q.Enqueue(1)
+	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_DequeueAfterClose(t *testing.T) {
+	q := New[int](3)
+	_ = q.Close()
+
+	_, err := q.Dequeue()
+	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_BlockingEnqueueAfterClose(t *testing.T) {
+	q := New[int](3)
+	_ = q.Close()
+
+	err := q.BlockingEnqueue(1)
+	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_BlockingDequeueAfterClose(t *testing.T) {
+	q := New[int](3)
+	_ = q.Close()
+
+	_, err := q.BlockingDequeue()
+	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_ConcurrentEnqueueAndClose(t *testing.T) {
+	q := New[int](3)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		err := q.Enqueue(1)
+		if err != nil && err != ErrQueueClosed {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(100 * time.Millisecond)
+		err := q.Close()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	wg.Wait()
+}
+
+func TestQueue_ConcurrentDequeueAndClose(t *testing.T) {
+	q := New[int](3)
+	q.Enqueue(1)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		_, err := q.Dequeue()
+		if err != nil && err != ErrQueueClosed {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(100 * time.Millisecond)
+		err := q.Close()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	wg.Wait()
+}
+
+func TestQueue_ConcurrentBlockingEnqueueAndClose(t *testing.T) {
+	q := New[int](1)
+	q.Enqueue(1)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		err := q.BlockingEnqueue(2)
+		if err != nil && err != ErrQueueClosed {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(100 * time.Millisecond)
+		err := q.Close()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	wg.Wait()
+}
+
+func TestQueue_ConcurrentBlockingDequeueAndClose(t *testing.T) {
+	q := New[int](3)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		_, err := q.BlockingDequeue()
+		if err != nil && err != ErrQueueClosed {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(100 * time.Millisecond)
+		err := q.Close()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	wg.Wait()
+}
+
 func ExampleQueue() {
 	q := New[string](3)
 
