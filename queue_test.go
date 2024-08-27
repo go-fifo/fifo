@@ -619,8 +619,6 @@ func TestQueue_ResizeWithWraparound(t *testing.T) {
 }
 
 func TestQueue_MassConcurrentBlocking(t *testing.T) {
-	t.Skip()
-
 	q := New[int](10)
 	const numGoroutines = 100
 	const numItems = 1000
