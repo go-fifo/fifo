@@ -514,6 +514,110 @@ func TestQueue_ConcurrentBlockingDequeueAndClose(t *testing.T) {
 	wg.Wait()
 }
 
+func TestQueue_Close(t *testing.T) {
+	q := New[int](3)
+
+	// Test closing an open queue
+	if err := q.Close(); err != nil {
+		t.Fatalf("unexpected error on Close: %v", err)
+	}
+
+	// Test closing an already closed queue
+	if err := q.Close(); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_CloseUnblocksBlockingEnqueue(t *testing.T) {
+	q := New[int](1)
+	q.Enqueue(1)
+
+	done := make(chan struct{})
+	go func() {
+		err := q.BlockingEnqueue(2)
+		if err != ErrQueueClosed {
+			t.Errorf("expected ErrQueueClosed, got: %v", err)
+		}
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	q.Close()
+
+	select {
+	case <-done:
+		// Test passed
+	case <-time.After(1 * time.Second):
+		t.Fatal("BlockingEnqueue was not unblocked by Close")
+	}
+}
+
+func TestQueue_CloseUnblocksBlockingDequeue(t *testing.T) {
+	q := New[int](1)
+
+	done := make(chan struct{})
+	go func() {
+		_, err := q.BlockingDequeue()
+		if err != ErrQueueClosed {
+			t.Errorf("expected ErrQueueClosed, got: %v", err)
+		}
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	q.Close()
+
+	select {
+	case <-done:
+		// Test passed
+	case <-time.After(1 * time.Second):
+		t.Fatal("BlockingDequeue was not unblocked by Close")
+	}
+}
+
+func TestQueue_EnqueueDequeueWithWraparound(t *testing.T) {
+	q := New[int](3)
+
+	// Fill the queue
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Dequeue two items
+	assertDequeueList(t, q, []int{1, 2}, intCompare)
+
+	// Enqueue two more items, causing wraparound
+	q.Enqueue(4)
+	q.Enqueue(5)
+
+	// Dequeue all items and check order
+	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
+}
+
+func TestQueue_ResizeWithWraparound(t *testing.T) {
+	q := New[int](3)
+
+	// Fill the queue
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Dequeue two items
+	assertDequeueList(t, q, []int{1, 2}, intCompare)
+
+	// Enqueue two more items, causing wraparound
+	q.Enqueue(4)
+	q.Enqueue(5)
+
+	// Resize the queue
+	if err := q.Resize(5); err != nil {
+		t.Fatalf("unexpected error on Resize: %v", err)
+	}
+
+	// Check if all items are preserved and in correct order
+	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
+}
+
 func ExampleQueue() {
 	q := New[string](3)
 
