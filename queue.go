@@ -17,8 +17,9 @@ var ErrNewCapacityTooSmall = errors.New("new capacity is too small")
 
 // Queue represents a thread-safe FIFO queue with resizable capacity.
 type Queue[T any] struct {
-	gMu   sync.RWMutex
-	rsMu  sync.Mutex
+	muEnq sync.Mutex
+	muDeq sync.Mutex
+	cond  *sync.Cond
 	items []T
 	head  int
 	tail  int
@@ -28,16 +29,21 @@ type Queue[T any] struct {
 
 // New creates a new Queue with the given initial capacity.
 func New[T any](initialCapacity int) *Queue[T] {
-	return &Queue[T]{
+	q := &Queue[T]{
 		items: make([]T, initialCapacity),
 		cap:   initialCapacity,
 	}
+	q.cond = sync.NewCond(&sync.Mutex{})
+	return q
 }
 
 // Enqueue adds an item to the queue. It returns an error if the queue is full.
 func (q *Queue[T]) Enqueue(item T) error {
-	q.gMu.Lock()
-	defer q.gMu.Unlock()
+	q.muEnq.Lock()
+	defer q.muEnq.Unlock()
+
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
 
 	if q.len == q.cap {
 		return ErrQueueFull
@@ -46,14 +52,18 @@ func (q *Queue[T]) Enqueue(item T) error {
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
+	q.cond.Signal()
 
 	return nil
 }
 
 // Dequeue removes and returns an item from the queue. It returns an error if the queue is empty.
 func (q *Queue[T]) Dequeue() (T, error) {
-	q.gMu.Lock()
-	defer q.gMu.Unlock()
+	q.muDeq.Lock()
+	defer q.muDeq.Unlock()
+
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
 
 	var zero T
 	if q.len == 0 {
@@ -64,31 +74,29 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	q.items[q.head] = zero // Clear the reference to allow garbage collection
 	q.head = (q.head + 1) % q.cap
 	q.len--
+	q.cond.Signal()
 
 	return item, nil
 }
 
 // Len returns the current number of items in the queue.
 func (q *Queue[T]) Len() int {
-	q.gMu.RLock()
-	defer q.gMu.RUnlock()
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
 	return q.len
 }
 
 // Cap returns the current capacity of the queue.
 func (q *Queue[T]) Cap() int {
-	q.gMu.RLock()
-	defer q.gMu.RUnlock()
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
 	return q.cap
 }
 
 // Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items.
 func (q *Queue[T]) Resize(newCap int) error {
-	q.rsMu.Lock()
-	defer q.rsMu.Unlock()
-
-	q.gMu.Lock()
-	defer q.gMu.Unlock()
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
 
 	if newCap == q.cap {
 		return nil
@@ -114,4 +122,44 @@ func (q *Queue[T]) Resize(newCap int) error {
 	q.cap = newCap
 
 	return nil
+}
+
+// BlockingEnqueue adds an item to the queue, blocking if the queue is full.
+func (q *Queue[T]) BlockingEnqueue(item T) {
+	q.muEnq.Lock()
+	defer q.muEnq.Unlock()
+
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	for q.len == q.cap {
+		q.cond.Wait()
+	}
+
+	q.items[q.tail] = item
+	q.tail = (q.tail + 1) % q.cap
+	q.len++
+	q.cond.Signal()
+}
+
+// BlockingDequeue removes and returns an item from the queue, blocking if the queue is empty.
+func (q *Queue[T]) BlockingDequeue() T {
+	q.muDeq.Lock()
+	defer q.muDeq.Unlock()
+
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	for q.len == 0 {
+		q.cond.Wait()
+	}
+
+	var zero T
+	item := q.items[q.head]
+	q.items[q.head] = zero // Clear the reference to allow garbage collection
+	q.head = (q.head + 1) % q.cap
+	q.len--
+	q.cond.Signal()
+
+	return item
 }
