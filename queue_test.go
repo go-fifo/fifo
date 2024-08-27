@@ -618,6 +618,130 @@ func TestQueue_ResizeWithWraparound(t *testing.T) {
 	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
 }
 
+func TestQueue_MassConcurrentBlocking(t *testing.T) {
+	t.Skip()
+
+	q := New[int](10)
+	const numGoroutines = 100
+	const numItems = 1000
+
+	var wg sync.WaitGroup
+
+	// Concurrent BlockingEnqueue
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(start int) {
+			defer wg.Done()
+			for j := start; j < start+numItems; j++ {
+				if err := q.BlockingEnqueue(j); err != nil && err != ErrQueueClosed {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		}(i * numItems)
+	}
+
+	// Concurrent BlockingDequeue
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < numItems; j++ {
+				_, err := q.BlockingDequeue()
+				if err != nil && err != ErrQueueClosed {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestQueue_SmallConcurrentBlocking(t *testing.T) {
+	num := 10
+	q := New[int](5)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	inputs := []int{}
+	outputs := []int{}
+
+	// Concurrent BlockingEnqueue
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 1; i <= num; i++ {
+			if err := q.BlockingEnqueue(i); err != nil && err != ErrQueueClosed {
+				t.Errorf("unexpected error: %v", err)
+			} else {
+				mu.Lock()
+				inputs = append(inputs, i)
+				mu.Unlock()
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	// Concurrent BlockingDequeue
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 1; i <= num; i++ {
+			val, err := q.BlockingDequeue()
+			if err != nil && err != ErrQueueClosed {
+				t.Errorf("unexpected error: %v", err)
+			} else {
+				mu.Lock()
+				outputs = append(outputs, val)
+				mu.Unlock()
+			}
+			time.Sleep(15 * time.Millisecond)
+		}
+	}()
+
+	wg.Wait()
+
+	if len(inputs) != len(outputs) {
+		t.Fatalf("expected input length %d, got output length %d", len(inputs), len(outputs))
+	}
+
+	for i := 0; i < len(inputs); i++ {
+		if inputs[i] != outputs[i] {
+			t.Fatalf("expected output %d at index %d, got %d", inputs[i], i, outputs[i])
+		}
+	}
+}
+
+func TestQueue_OneCapacity(t *testing.T) {
+	q := New[int](1)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Enqueue in a separate goroutine
+	go func() {
+		defer wg.Done()
+		time.Sleep(10 * time.Millisecond)
+		err := q.BlockingEnqueue(1)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	// Dequeue in the main goroutine
+	go func() {
+		defer wg.Done()
+		val, err := q.BlockingDequeue()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if val != 1 {
+			t.Fatalf("expected 1, got %d", val)
+		}
+	}()
+
+	wg.Wait()
+}
+
 func ExampleQueue() {
 	q := New[string](3)
 

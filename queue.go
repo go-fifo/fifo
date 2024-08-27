@@ -15,6 +15,9 @@ var ErrQueueEmpty = errors.New("queue is empty")
 // ErrNewCapacityTooSmall is returned when an attempt is made to resize the queue to a capacity smaller than the current number of items.
 var ErrNewCapacityTooSmall = errors.New("new capacity is too small")
 
+// ErrCapacityNotPositive is returned when an attempt is made to create a queue with a non-positive capacity.
+var ErrCapacityNotPositive = errors.New("capacity must be positive")
+
 // ErrQueueClosed is returned when an attempt is made to perform an operation on a closed queue.
 var ErrQueueClosed = errors.New("queue is closed")
 
@@ -30,8 +33,11 @@ type Queue[T any] struct {
 	closed bool
 }
 
-// New creates a new Queue with the given initial capacity.
+// New creates a new Queue with the given initial capacity, or panics if the capacity is not positive.
 func New[T any](initialCapacity int) *Queue[T] {
+	if initialCapacity <= 0 {
+		panic(ErrCapacityNotPositive)
+	}
 	q := &Queue[T]{
 		items: make([]T, initialCapacity),
 		cap:   initialCapacity,
@@ -154,7 +160,7 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 	return item, nil
 }
 
-// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items.
+// Resize changes the capacity of the queue. It returns if the new capacity is smaller than the current number of items, or not positive, or if the queue is closed.
 func (q *Queue[T]) Resize(newCap int) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -162,9 +168,14 @@ func (q *Queue[T]) Resize(newCap int) error {
 	if newCap == q.cap {
 		return nil
 	}
-
+	if newCap <= 0 {
+		return ErrCapacityNotPositive
+	}
 	if newCap < q.len {
 		return ErrNewCapacityTooSmall
+	}
+	if q.closed {
+		return ErrQueueClosed
 	}
 
 	newItems := make([]T, newCap)
