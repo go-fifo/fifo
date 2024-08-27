@@ -37,6 +37,20 @@ func New[T any](initialCapacity int) *Queue[T] {
 	return q
 }
 
+// Len returns the current number of items in the queue.
+func (q *Queue[T]) Len() int {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	return q.len
+}
+
+// Cap returns the current capacity of the queue.
+func (q *Queue[T]) Cap() int {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	return q.cap
+}
+
 // Enqueue adds an item to the queue. It returns an error if the queue is full.
 func (q *Queue[T]) Enqueue(item T) error {
 	q.muEnq.Lock()
@@ -79,52 +93,6 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	return item, nil
 }
 
-// Len returns the current number of items in the queue.
-func (q *Queue[T]) Len() int {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
-	return q.len
-}
-
-// Cap returns the current capacity of the queue.
-func (q *Queue[T]) Cap() int {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
-	return q.cap
-}
-
-// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items.
-func (q *Queue[T]) Resize(newCap int) error {
-	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
-
-	if newCap == q.cap {
-		return nil
-	}
-
-	if newCap < q.len {
-		return ErrNewCapacityTooSmall
-	}
-
-	newItems := make([]T, newCap)
-	if q.len > 0 {
-		if q.tail > q.head {
-			copy(newItems, q.items[q.head:q.tail])
-		} else {
-			n := copy(newItems, q.items[q.head:])
-			copy(newItems[n:], q.items[:q.tail])
-		}
-	}
-
-	q.items = newItems
-	q.head = 0
-	q.tail = q.len
-	q.cap = newCap
-	q.cond.Broadcast()
-
-	return nil
-}
-
 // BlockingEnqueue adds an item to the queue, blocking if the queue is full.
 func (q *Queue[T]) BlockingEnqueue(item T) {
 	q.muEnq.Lock()
@@ -163,4 +131,36 @@ func (q *Queue[T]) BlockingDequeue() T {
 	q.cond.Signal()
 
 	return item
+}
+
+// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items.
+func (q *Queue[T]) Resize(newCap int) error {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	if newCap == q.cap {
+		return nil
+	}
+
+	if newCap < q.len {
+		return ErrNewCapacityTooSmall
+	}
+
+	newItems := make([]T, newCap)
+	if q.len > 0 {
+		if q.tail > q.head {
+			copy(newItems, q.items[q.head:q.tail])
+		} else {
+			n := copy(newItems, q.items[q.head:])
+			copy(newItems[n:], q.items[:q.tail])
+		}
+	}
+
+	q.items = newItems
+	q.head = 0
+	q.tail = q.len
+	q.cap = newCap
+	q.cond.Broadcast()
+
+	return nil
 }
