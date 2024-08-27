@@ -120,6 +120,7 @@ func (q *Queue[T]) Resize(newCap int) error {
 	q.head = 0
 	q.tail = q.len
 	q.cap = newCap
+	q.cond.Broadcast()
 
 	return nil
 }

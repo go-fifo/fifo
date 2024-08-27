@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 // assertDequeueList is a helper function to assert that the dequeued items match the expected values.
@@ -215,6 +216,104 @@ func TestQueue_ConcurrentResize(t *testing.T) {
 			t.Fatalf("expected %d, got: %v, err: %v", i, item, err)
 		}
 	}
+}
+
+func TestQueue_Blocking(t *testing.T) {
+	q := New[int](1)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		q.Enqueue(1)
+		t.Logf("just enqueued 1")
+
+		q.BlockingEnqueue(2)
+		t.Logf("blocking enqueued 2")
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		time.Sleep(100 * time.Millisecond)
+		item, err := q.Dequeue()
+		t.Logf("just dequeued %d -- %v", item, err)
+
+		item = q.BlockingDequeue()
+		t.Logf("blocking dequeued %d", item)
+	}()
+
+	wg.Wait()
+}
+
+func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
+	q := New[int](1)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			q.BlockingDequeue()
+		}()
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			q.BlockingEnqueue(idx)
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
+	q := New[int](1)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			q.BlockingEnqueue(idx)
+		}(i)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			q.BlockingDequeue()
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestQueue_BlockingEnqueueResize(t *testing.T) {
+	q := New[int](1)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			q.BlockingEnqueue(idx)
+		}(i)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	_ = q.Resize(30)
+	time.Sleep(100 * time.Millisecond)
+	wg.Wait()
 }
 
 func ExampleQueue() {
