@@ -401,9 +401,10 @@ func TestQueue_DequeueLen(t *testing.T) {
 
 func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 	q := New[int](1)
+	times := 5
 
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
+	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -412,7 +413,7 @@ func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -425,9 +426,10 @@ func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 
 func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 	q := New[int](1)
+	times := 5
 
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
+	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -436,7 +438,7 @@ func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
