@@ -76,10 +76,7 @@ func (q *Queue[T]) Enqueue(item T) error {
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
-
-	if q.len == 1 {
-		q.cond.Signal() // Signal only when transitioning from empty to non-empty
-	}
+	q.cond.Signal()
 
 	return nil
 }
@@ -123,10 +120,7 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	q.items[q.head] = zero // Clear the reference to allow garbage collection
 	q.head = (q.head + 1) % q.cap
 	q.len--
-
-	if q.len == q.cap-1 {
-		q.cond.Signal() // Signal only when transitioning from full to non-full
-	}
+	q.cond.Signal()
 
 	return item, nil
 }
