@@ -768,7 +768,7 @@ func TestQueue_MassConcurrentBlocking(t *testing.T) {
 		go func(start int) {
 			defer wg.Done()
 			for j := start; j < start+numItems; j++ {
-				if err := q.BlockingEnqueue(j); err != nil && err != ErrQueueClosed {
+				if err := q.BlockingEnqueue(j); err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			}
@@ -782,7 +782,7 @@ func TestQueue_MassConcurrentBlocking(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numItems; j++ {
 				_, err := q.BlockingDequeue()
-				if err != nil && err != ErrQueueClosed {
+				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			}
