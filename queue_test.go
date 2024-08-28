@@ -430,7 +430,7 @@ func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 
 func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 	q := New[int](1)
-	times := 5
+	times := 20
 
 	var wg sync.WaitGroup
 	for i := 0; i < times; i++ {
@@ -459,7 +459,7 @@ func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 
 func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	q := New[int](1)
-	times := 5
+	times := 20
 
 	var wg sync.WaitGroup
 	for i := 0; i < times; i++ {

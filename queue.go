@@ -76,7 +76,7 @@ func (q *Queue[T]) Enqueue(item T) error {
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
-	q.cond.Signal()
+	q.cond.Broadcast()
 
 	return nil
 }
@@ -97,7 +97,7 @@ func (q *Queue[T]) BlockingEnqueue(item T) error {
 	q.items[q.tail] = item
 	q.tail = (q.tail + 1) % q.cap
 	q.len++
-	q.cond.Signal()
+	q.cond.Broadcast()
 
 	return nil
 }
@@ -120,7 +120,7 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	q.items[q.head] = zero // Clear the reference to allow garbage collection
 	q.head = (q.head + 1) % q.cap
 	q.len--
-	q.cond.Signal()
+	q.cond.Broadcast()
 
 	return item, nil
 }
@@ -143,7 +143,7 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 	q.items[q.head] = zero
 	q.head = (q.head + 1) % q.cap
 	q.len--
-	q.cond.Signal()
+	q.cond.Broadcast()
 
 	return item, nil
 }
