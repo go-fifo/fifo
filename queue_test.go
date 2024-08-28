@@ -486,8 +486,6 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	times := 20
 
 	var wg sync.WaitGroup
-	var resizeWg sync.WaitGroup
-
 	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -496,19 +494,39 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 		}(i)
 	}
 
+	// Resize the queue
 	time.Sleep(10 * time.Millisecond)
-
 	for i := 0; i < times; i++ {
-		resizeWg.Add(1)
+		wg.Add(1)
 		go func(idx int) {
-			defer resizeWg.Done()
+			defer wg.Done()
 			q.Resize(2 + idx)
 		}(i)
 	}
 
-	// Wait for all resizing to complete before waiting for enqueues to finish
-	resizeWg.Wait()
+	// Wait for all enqueue operations to complete
 	wg.Wait()
+
+	// Verify the queue contents
+	if q.Len() != times {
+		t.Errorf("Expected queue length %d, got %d", times, q.Len())
+	}
+
+	seen := make(map[int]bool)
+	for i := 0; i < times; i++ {
+		item, err := q.Dequeue()
+		if err != nil {
+			t.Errorf("Unexpected error during Dequeue: %v", err)
+		}
+		if seen[item] {
+			t.Errorf("Duplicate item found: %d", item)
+		}
+		seen[item] = true
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("Expected empty queue, got length %d", q.Len())
+	}
 }
 
 func TestQueue_EnqueueAfterClose(t *testing.T) {
