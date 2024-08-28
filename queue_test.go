@@ -740,6 +740,45 @@ func TestQueue_OneCapacity(t *testing.T) {
 	wg.Wait()
 }
 
+func TestQueue_NewWithNonPositiveCapacity(t *testing.T) {
+	defer func() {
+		if r := recover(); r != ErrCapacityNotPositive {
+			t.Fatalf("expected panic with ErrCapacityNotPositive, got: %v", r)
+		}
+	}()
+
+	New[int](0) // This should panic with ErrCapacityNotPositive
+}
+
+func TestQueue_ResizeToNonPositiveCapacity(t *testing.T) {
+	q := New[int](3)
+
+	err := q.Resize(0)
+	if err != ErrCapacityNotPositive {
+		t.Fatalf("expected ErrCapacityNotPositive, got: %v", err)
+	}
+
+	err = q.Resize(-1)
+	if err != ErrCapacityNotPositive {
+		t.Fatalf("expected ErrCapacityNotPositive, got: %v", err)
+	}
+}
+
+func TestQueue_ResizeWhenClosed(t *testing.T) {
+	q := New[int](3)
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Close the queue
+	q.Close()
+
+	err := q.Resize(5)
+	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
 func ExampleQueue() {
 	q := New[string](3)
 
