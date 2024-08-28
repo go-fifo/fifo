@@ -252,16 +252,52 @@ func TestQueue_ResizeTooSmall(t *testing.T) {
 	q.Enqueue(3)
 
 	err := q.Resize(2)
-	if err != ErrNewCapacityTooSmall {
-		t.Fatalf("expected ErrNewCapacityTooSmall, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if q.Cap() != 5 {
-		t.Fatalf("expected cap 5, got: %d", q.Cap())
+	if q.Len() != 3 {
+		t.Fatalf("expected len 3, got: %d", q.Len())
+	}
+	if q.Cap() != 2 {
+		t.Fatalf("expected cap 2, got: %d", q.Cap())
 	}
 
 	// Ensure no data loss
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Check new data works
+	q.Enqueue(4)
+	q.Enqueue(5)
+	if err := q.Enqueue(6); err != ErrQueueFull {
+		t.Fatalf("expected ErrQueueFull, got: %v", err)
+	}
+	assertDequeueList(t, q, []int{4, 5}, intCompare)
+
+	// Resize larger
+	if err := q.Resize(3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check more data works
+	q.Enqueue(8)
+	q.Enqueue(9)
+	q.Enqueue(10)
+	if err := q.Enqueue(11); err != ErrQueueFull {
+		t.Fatalf("expected ErrQueueFull, got: %v", err)
+	}
+	assertDequeueList(t, q, []int{8, 9, 10}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("expected len 0, got: %d", q.Len())
+	}
+	if q.Cap() != 3 {
+		t.Fatalf("expected cap 2, got: %d", q.Cap())
+	}
 }
 
 func TestQueue_ResizeEmptyQueue(t *testing.T) {
