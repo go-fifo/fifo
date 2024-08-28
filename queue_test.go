@@ -96,6 +96,30 @@ func TestQueue_ResizeUp(t *testing.T) {
 	assertDequeueList(t, q, []int{4, 5, 6, 7, 8}, intCompare)
 }
 
+func TestQueue_ResizeUp2(t *testing.T) {
+	q := New[int](3)
+
+	// Fill the queue
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Dequeue two items
+	assertDequeueList(t, q, []int{1, 2}, intCompare)
+
+	// Enqueue two more items, causing wraparound
+	q.Enqueue(4)
+	q.Enqueue(5)
+
+	// Resize the queue
+	if err := q.Resize(5); err != nil {
+		t.Fatalf("unexpected error on Resize: %v", err)
+	}
+
+	// Check if all items are preserved and in correct order
+	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
+}
+
 func TestQueue_ResizeDown(t *testing.T) {
 	q := New[int](5)
 	q.Enqueue(1)
@@ -705,30 +729,6 @@ func TestQueue_EnqueueDequeueWithWraparound(t *testing.T) {
 	q.Enqueue(5)
 
 	// Dequeue all items and check order
-	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
-}
-
-func TestQueue_ResizeWithWraparound(t *testing.T) {
-	q := New[int](3)
-
-	// Fill the queue
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
-
-	// Dequeue two items
-	assertDequeueList(t, q, []int{1, 2}, intCompare)
-
-	// Enqueue two more items, causing wraparound
-	q.Enqueue(4)
-	q.Enqueue(5)
-
-	// Resize the queue
-	if err := q.Resize(5); err != nil {
-		t.Fatalf("unexpected error on Resize: %v", err)
-	}
-
-	// Check if all items are preserved and in correct order
 	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
 }
 
