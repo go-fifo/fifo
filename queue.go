@@ -146,7 +146,7 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 	return item, nil
 }
 
-// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items, or not positive, or if the queue is closed.
+// Resize changes the capacity of the queue. It returns an error if the new capacity is not positive, or if the queue is closed.
 func (q *Queue[T]) Resize(newCap int) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
