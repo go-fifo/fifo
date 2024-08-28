@@ -146,7 +146,7 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 	return item, nil
 }
 
-// Resize changes the capacity of the queue. It returns if the new capacity is smaller than the current number of items, or not positive, or if the queue is closed.
+// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items, not positive, or if the queue is closed.
 func (q *Queue[T]) Resize(newCap int) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -176,9 +176,9 @@ func (q *Queue[T]) Resize(newCap int) error {
 
 	q.items = newItems
 	q.head = 0
-	q.tail = q.len % newCap
+	q.tail = q.len % newCap // Adjust the tail position based on the new capacity
 	q.cap = newCap
-	q.cond.Broadcast()
+	q.cond.Broadcast() // Wake up all goroutines waiting due to full queue
 
 	return nil
 }

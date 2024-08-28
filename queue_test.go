@@ -486,6 +486,8 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	times := 20
 
 	var wg sync.WaitGroup
+	var resizeWg sync.WaitGroup
+
 	for i := 0; i < times; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -495,14 +497,17 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	}
 
 	time.Sleep(10 * time.Millisecond)
+
 	for i := 0; i < times; i++ {
-		wg.Add(1)
+		resizeWg.Add(1)
 		go func(idx int) {
-			defer wg.Done()
+			defer resizeWg.Done()
 			q.Resize(2 + idx)
 		}(i)
 	}
 
+	// Wait for all resizing to complete before waiting for enqueues to finish
+	resizeWg.Wait()
 	wg.Wait()
 }
 
