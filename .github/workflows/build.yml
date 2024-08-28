@@ -1,0 +1,99 @@
+name: Build
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+defaults:
+  run:
+    shell: bash
+
+permissions: read-all
+
+jobs:
+  build:
+    name: Test with ${{ matrix.go-version }} on ${{ matrix.vm-os }}
+    runs-on: ${{ matrix.vm-os }}
+    env:
+      CI_REPORT: ${{ matrix.vm-os == 'ubuntu-20.04' && matrix.go-version == '1.18.10' }}
+    strategy:
+      max-parallel: 10
+      fail-fast: false
+      matrix:
+        vm-os: [
+          ubuntu-20.04,
+          macos-13,
+          macos-14,
+          windows-2022
+        ]
+        go-version: [
+          1.18.10,
+          1.19.13,
+          1.20.14,
+          1.21.13,
+          1.22.6,
+          1.23.0,
+        ]
+    permissions:
+      contents: read
+    # Steps to execute
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: false
+      - name: Go Build
+        run: |
+          export
+          git status
+          go version
+          go mod download
+          make --version
+      - name: Test
+        run: |
+          go test -v -race -cover -covermode=atomic -coverprofile=coverage.txt -count 1 .
+          go test -v -parallel=4 -run="none" -benchtime="2s" -benchmem -bench=.
+      # - name: Upload Coverage Reports to Codecov
+      #   if: ${{ fromJSON(env.CI_REPORT) }}
+      #   uses: codecov/codecov-action@v3
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: coverage.txt
+      # - name: Upload Coverage Reports to Codacy
+      #   if: ${{ fromJSON(env.CI_REPORT) }}
+      #   env:
+      #     CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+      #   run:
+      #     bash <(curl -Ls https://coverage.codacy.com/get.sh) report --force-coverage-parser go -r coverage.txt
+      - name: Analyze
+        if: ${{ runner.os == 'macOS' || runner.os == 'Linux' }}
+        run: |
+          # Setup
+          if [[ ${{ runner.os }} == 'Linux' ]]; then
+            wget -cqL https://github.com/XAMPPRocky/tokei/releases/download/v12.1.2/tokei-i686-unknown-linux-musl.tar.gz -O tokei.tgz
+            wget -cqL https://github.com/mgechev/revive/releases/download/v1.3.7/revive_linux_amd64.tar.gz -O revive.tgz
+          elif [[ ${{ runner.os }} == 'macOS' ]]; then
+            wget -cqL https://github.com/XAMPPRocky/tokei/releases/download/v12.1.2/tokei-x86_64-apple-darwin.tar.gz -O tokei.tgz
+            wget -cqL https://github.com/mgechev/revive/releases/download/v1.3.7/revive_darwin_amd64.tar.gz -O revive.tgz
+          fi
+          tar zxf tokei.tgz tokei && chmod +x tokei && $SUDO mv tokei /usr/local/bin && rm tokei.tgz
+          tar zxf revive.tgz revive && chmod +x revive && $SUDO mv revive /usr/local/bin && rm revive.tgz
+          wget -cqL https://raw.githubusercontent.com/1set/meta/master/revive.toml -O revive.toml
+          # Analyze
+          echo "# Analysis on ${{ runner.os }}" > $GITHUB_STEP_SUMMARY
+          uname -a >> $GITHUB_STEP_SUMMARY
+          # --- count lines of code
+          echo "## Tokei Result" >> $GITHUB_STEP_SUMMARY
+          printf '\n```\n' >> $GITHUB_STEP_SUMMARY
+          tokei >> $GITHUB_STEP_SUMMARY
+          printf '```\n\n' >> $GITHUB_STEP_SUMMARY
+          # --- lint
+          echo "## Revive Result" >> $GITHUB_STEP_SUMMARY
+          printf '\n```\n' >> $GITHUB_STEP_SUMMARY
+          revive -config revive.toml -formatter friendly ./... >> $GITHUB_STEP_SUMMARY
+          printf '```\n\n' >> $GITHUB_STEP_SUMMARY
+          printf '```\n\n' >> $GITHUB_STEP_SUMMARY
