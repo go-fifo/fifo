@@ -184,7 +184,7 @@ func (q *Queue[T]) Resize(newCap int) error {
 
 	q.items = newItems
 	q.head = 0
-	q.tail = q.len
+	q.tail = q.len % newCap
 	q.cap = newCap
 	q.cond.Broadcast()
 

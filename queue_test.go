@@ -117,11 +117,60 @@ func TestQueue_ResizeDown(t *testing.T) {
 	q.Enqueue(4)
 	q.Enqueue(5)
 	q.Enqueue(6)
-
 	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("expected len 0, got: %d", q.Len())
+	}
 }
 
-func TestQueue_ResizeDownWithWrapAround(t *testing.T) {
+func TestQueue_ResizeDown2(t *testing.T) {
+	q := New[int](5)
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	if err := q.Resize(4); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if q.Cap() != 4 {
+		t.Fatalf("expected cap 4, got: %d", q.Cap())
+	}
+
+	// Ensure no data loss
+	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Check new data works
+	q.Enqueue(4)
+	q.Enqueue(5)
+	q.Enqueue(6)
+	q.Enqueue(7)
+	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
+
+	// Check more data works
+	q.Enqueue(8)
+	q.Enqueue(9)
+	q.Enqueue(10)
+	if err := q.Enqueue(11); err != ErrQueueFull {
+		t.Fatalf("expected ErrQueueFull, got: %v", err)
+	}
+	assertDequeueList(t, q, []int{7, 8, 9, 10}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("expected len 0, got: %d", q.Len())
+	}
+}
+
+func TestQueue_ResizeDown3(t *testing.T) {
 	q := New[int](5)
 
 	// Fill the queue
@@ -144,6 +193,14 @@ func TestQueue_ResizeDownWithWrapAround(t *testing.T) {
 
 	// Check if all items are preserved and in correct order
 	assertDequeueList(t, q, []int{3, 4, 5, 6}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("expected len 0, got: %d", q.Len())
+	}
 }
 
 func TestQueue_ResizeSameSize(t *testing.T) {
