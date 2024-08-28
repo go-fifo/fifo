@@ -12,9 +12,6 @@ var ErrQueueFull = errors.New("queue is full")
 // ErrQueueEmpty is returned when an attempt is made to remove an element from an empty queue.
 var ErrQueueEmpty = errors.New("queue is empty")
 
-// ErrNewCapacityTooSmall is returned when an attempt is made to resize the queue to a capacity smaller than the current number of items.
-var ErrNewCapacityTooSmall = errors.New("new capacity is too small")
-
 // ErrCapacityNotPositive is returned when an attempt is made to create a queue with a non-positive capacity.
 var ErrCapacityNotPositive = errors.New("capacity must be positive")
 
