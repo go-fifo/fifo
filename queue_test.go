@@ -121,6 +121,31 @@ func TestQueue_ResizeDown(t *testing.T) {
 	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
 }
 
+func TestQueue_ResizeDownWithWrapAround(t *testing.T) {
+	q := New[int](5)
+
+	// Fill the queue
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+	q.Enqueue(4)
+	q.Enqueue(5)
+
+	// Dequeue two items
+	assertDequeueList(t, q, []int{1, 2}, intCompare)
+
+	// Enqueue two more items, causing wraparound
+	q.Enqueue(6)
+
+	// Resize the queue down
+	if err := q.Resize(4); err != nil {
+		t.Fatalf("unexpected error on Resize: %v", err)
+	}
+
+	// Check if all items are preserved and in correct order
+	assertDequeueList(t, q, []int{3, 4, 5, 6}, intCompare)
+}
+
 func TestQueue_ResizeSameSize(t *testing.T) {
 	q := New[int](3)
 	q.Enqueue(1)

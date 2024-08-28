@@ -84,6 +84,27 @@ func (q *Queue[T]) Enqueue(item T) error {
 	return nil
 }
 
+// BlockingEnqueue adds an item to the end of the queue. If the queue is full, the calling goroutine is blocked until space becomes available.
+func (q *Queue[T]) BlockingEnqueue(item T) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for q.len == q.cap && !q.closed {
+		q.cond.Wait()
+	}
+
+	if q.closed {
+		return ErrQueueClosed
+	}
+
+	q.items[q.tail] = item
+	q.tail = (q.tail + 1) % q.cap
+	q.len++
+	q.cond.Signal()
+
+	return nil
+}
+
 // Dequeue removes and returns the item at the front of the queue. If the queue is empty, ErrQueueEmpty is returned.
 func (q *Queue[T]) Dequeue() (T, error) {
 	q.mu.Lock()
@@ -108,27 +129,6 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	}
 
 	return item, nil
-}
-
-// BlockingEnqueue adds an item to the end of the queue. If the queue is full, the calling goroutine is blocked until space becomes available.
-func (q *Queue[T]) BlockingEnqueue(item T) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	for q.len == q.cap && !q.closed {
-		q.cond.Wait()
-	}
-
-	if q.closed {
-		return ErrQueueClosed
-	}
-
-	q.items[q.tail] = item
-	q.tail = (q.tail + 1) % q.cap
-	q.len++
-	q.cond.Signal()
-
-	return nil
 }
 
 // BlockingDequeue removes and returns the item at the front of the queue. If the queue is empty, the calling goroutine is blocked until an item becomes available.
@@ -174,7 +174,7 @@ func (q *Queue[T]) Resize(newCap int) error {
 
 	newItems := make([]T, newCap)
 	if q.len > 0 {
-		if q.tail > q.head {
+		if q.head < q.tail {
 			copy(newItems, q.items[q.head:q.tail])
 		} else {
 			n := copy(newItems, q.items[q.head:])
