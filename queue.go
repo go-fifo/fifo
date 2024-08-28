@@ -108,11 +108,10 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	defer q.mu.Unlock()
 
 	var zero T
-	if q.closed {
-		return zero, ErrQueueClosed
-	}
-
 	if q.len == 0 {
+		if q.closed {
+			return zero, ErrQueueClosed
+		}
 		return zero, ErrQueueEmpty
 	}
 
@@ -130,13 +129,12 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	for q.len == 0 && !q.closed {
-		q.cond.Wait()
-	}
-
 	var zero T
-	if q.closed {
-		return zero, ErrQueueClosed
+	for q.len == 0 {
+		if q.closed {
+			return zero, ErrQueueClosed
+		}
+		q.cond.Wait()
 	}
 
 	item := q.items[q.head]
