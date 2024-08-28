@@ -85,6 +85,15 @@ func TestQueue_ResizeUp(t *testing.T) {
 
 	// Ensure no data loss
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Check new data works
+	q.Enqueue(4)
+	q.Enqueue(5)
+	q.Enqueue(6)
+	q.Enqueue(7)
+	q.Enqueue(8)
+
+	assertDequeueList(t, q, []int{4, 5, 6, 7, 8}, intCompare)
 }
 
 func TestQueue_ResizeDown(t *testing.T) {
@@ -103,6 +112,13 @@ func TestQueue_ResizeDown(t *testing.T) {
 
 	// Ensure no data loss
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Check new data works
+	q.Enqueue(4)
+	q.Enqueue(5)
+	q.Enqueue(6)
+
+	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
 }
 
 func TestQueue_ResizeSameSize(t *testing.T) {
