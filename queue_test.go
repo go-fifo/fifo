@@ -252,16 +252,52 @@ func TestQueue_ResizeTooSmall(t *testing.T) {
 	q.Enqueue(3)
 
 	err := q.Resize(2)
-	if err != ErrNewCapacityTooSmall {
-		t.Fatalf("expected ErrNewCapacityTooSmall, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if q.Cap() != 5 {
-		t.Fatalf("expected cap 5, got: %d", q.Cap())
+	if q.Len() != 3 {
+		t.Fatalf("expected len 3, got: %d", q.Len())
+	}
+	if q.Cap() != 2 {
+		t.Fatalf("expected cap 2, got: %d", q.Cap())
 	}
 
 	// Ensure no data loss
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Check new data works
+	q.Enqueue(4)
+	q.Enqueue(5)
+	if err := q.Enqueue(6); err != ErrQueueFull {
+		t.Fatalf("expected ErrQueueFull, got: %v", err)
+	}
+	assertDequeueList(t, q, []int{4, 5}, intCompare)
+
+	// Resize larger
+	if err := q.Resize(3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check more data works
+	q.Enqueue(8)
+	q.Enqueue(9)
+	q.Enqueue(10)
+	if err := q.Enqueue(11); err != ErrQueueFull {
+		t.Fatalf("expected ErrQueueFull, got: %v", err)
+	}
+	assertDequeueList(t, q, []int{8, 9, 10}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("expected len 0, got: %d", q.Len())
+	}
+	if q.Cap() != 3 {
+		t.Fatalf("expected cap 2, got: %d", q.Cap())
+	}
 }
 
 func TestQueue_ResizeEmptyQueue(t *testing.T) {
@@ -908,6 +944,39 @@ func TestQueue_ResizeWhenClosed(t *testing.T) {
 
 	err := q.Resize(5)
 	if err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
+func TestQueue_OperationsAfterClosed(t *testing.T) {
+	q := New[int](3)
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Close the queue
+	q.Close()
+
+	// Ensure no data loss
+	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't add more items
+	if err := q.Enqueue(4); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't resize
+	if err := q.Resize(5); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't close again
+	if err := q.Close(); err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
 }

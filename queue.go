@@ -12,9 +12,6 @@ var ErrQueueFull = errors.New("queue is full")
 // ErrQueueEmpty is returned when an attempt is made to remove an element from an empty queue.
 var ErrQueueEmpty = errors.New("queue is empty")
 
-// ErrNewCapacityTooSmall is returned when an attempt is made to resize the queue to a capacity smaller than the current number of items.
-var ErrNewCapacityTooSmall = errors.New("new capacity is too small")
-
 // ErrCapacityNotPositive is returned when an attempt is made to create a queue with a non-positive capacity.
 var ErrCapacityNotPositive = errors.New("capacity must be positive")
 
@@ -69,12 +66,12 @@ func (q *Queue[T]) Enqueue(item T) error {
 		return ErrQueueClosed
 	}
 
-	if q.len == q.cap {
+	if q.len >= q.cap {
 		return ErrQueueFull
 	}
 
 	q.items[q.tail] = item
-	q.tail = (q.tail + 1) % q.cap
+	q.tail = (q.tail + 1) % cap(q.items)
 	q.len++
 	q.cond.Broadcast()
 
@@ -86,7 +83,7 @@ func (q *Queue[T]) BlockingEnqueue(item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	for q.len == q.cap && !q.closed {
+	for q.len >= q.cap && !q.closed {
 		q.cond.Wait()
 	}
 
@@ -95,7 +92,7 @@ func (q *Queue[T]) BlockingEnqueue(item T) error {
 	}
 
 	q.items[q.tail] = item
-	q.tail = (q.tail + 1) % q.cap
+	q.tail = (q.tail + 1) % cap(q.items)
 	q.len++
 	q.cond.Broadcast()
 
@@ -117,7 +114,7 @@ func (q *Queue[T]) Dequeue() (T, error) {
 
 	item := q.items[q.head]
 	q.items[q.head] = zero // Clear the reference to allow garbage collection
-	q.head = (q.head + 1) % q.cap
+	q.head = (q.head + 1) % cap(q.items)
 	q.len--
 	q.cond.Broadcast()
 
@@ -139,14 +136,14 @@ func (q *Queue[T]) BlockingDequeue() (T, error) {
 
 	item := q.items[q.head]
 	q.items[q.head] = zero
-	q.head = (q.head + 1) % q.cap
+	q.head = (q.head + 1) % cap(q.items)
 	q.len--
 	q.cond.Broadcast()
 
 	return item, nil
 }
 
-// Resize changes the capacity of the queue. It returns an error if the new capacity is smaller than the current number of items, or not positive, or if the queue is closed.
+// Resize changes the capacity of the queue. It returns an error if the new capacity is not positive, or if the queue is closed.
 func (q *Queue[T]) Resize(newCap int) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -157,14 +154,18 @@ func (q *Queue[T]) Resize(newCap int) error {
 	if newCap <= 0 {
 		return ErrCapacityNotPositive
 	}
-	if newCap < q.len {
-		return ErrNewCapacityTooSmall
-	}
 	if q.closed {
 		return ErrQueueClosed
 	}
 
-	newItems := make([]T, newCap)
+	// Ensure no data loss
+	ns := newCap
+	if q.len > ns {
+		ns = q.len
+	}
+	newItems := make([]T, ns)
+
+	// Copy data from old slice to new slice
 	if q.len > 0 {
 		if q.head < q.tail {
 			copy(newItems, q.items[q.head:q.tail])
@@ -176,7 +177,7 @@ func (q *Queue[T]) Resize(newCap int) error {
 
 	q.items = newItems
 	q.head = 0
-	q.tail = q.len % newCap // Adjust the tail position based on the new capacity
+	q.tail = q.len % ns // Adjust the tail position based on the actual capacity of the new slice
 	q.cap = newCap
 	q.cond.Broadcast() // Wake up all goroutines waiting due to full queue
 
