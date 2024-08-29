@@ -21,7 +21,7 @@ The `fifo` package provides a thread-safe FIFO (First In, First Out) queue with 
 
 ## Installation
 
-To install the package, run:
+Ensure you have Go 1.18 or higher (required for generics). To install the package, execute:
 
 ```bash
 go get gopkg.in/fifo.v0
@@ -201,4 +201,4 @@ func main() {
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
