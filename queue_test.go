@@ -632,39 +632,94 @@ func TestQueue_MassConcurrentBlocking(t *testing.T) {
 func ExampleQueue() {
 	q := New[string](3)
 
+	// Enqueue items
 	q.TryEnqueue("A")
 	q.TryEnqueue("B")
 	q.TryEnqueue("C")
 
-	fmt.Println("Length:", q.Len())
-	fmt.Println("Capacity:", q.Cap())
+	fmt.Println("Length after enqueueing 3 items:", q.Len())
+	fmt.Println("Capacity after enqueueing 3 items:", q.Cap())
 
-	fmt.Println("Exceeded:", q.TryEnqueue("X"))
+	// Try to enqueue when full
+	err := q.TryEnqueue("D")
+	fmt.Println("TryEnqueue when full:", err)
 
+	// Dequeue an item
 	item, _ := q.TryDequeue()
-	fmt.Println("Dequeued:", item)
+	fmt.Println("Dequeued item:", item)
 
+	// Enqueue another item
 	q.TryEnqueue("D")
-	fmt.Println("Resized:", q.Resize(4))
-	fmt.Println("Length:", q.Len())
-	fmt.Println("Capacity:", q.Cap())
-	q.TryEnqueue("E")
 
+	// Resize the queue
+	err = q.Resize(5)
+	fmt.Println("Resize result:", err)
+	fmt.Println("Capacity after resize:", q.Cap())
+
+	// Enqueue more items
+	q.TryEnqueue("E")
+	q.TryEnqueue("F")
+
+	// Dequeue all items
 	for q.Len() > 0 {
 		item, _ := q.TryDequeue()
-		fmt.Println("Dequeued:", item)
+		fmt.Println("Dequeued item:", item)
 	}
 
+	// Concurrent operations
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			q.Enqueue(fmt.Sprintf("G%d", i))
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			item, _ := q.Dequeue()
+			fmt.Println("Concurrent dequeued item:", item)
+			time.Sleep(15 * time.Millisecond)
+		}
+	}()
+
+	wg.Wait()
+
+	// Close the queue
+	q.Close()
+
+	// Try operations after closing
+	err = q.TryEnqueue("H")
+	fmt.Println("TryEnqueue after close:", err)
+
+	_, err = q.TryDequeue()
+	fmt.Println("TryDequeue after close:", err)
+
+	err = q.Resize(10)
+	fmt.Println("Resize after close:", err)
+
 	// Output:
-	// Length: 3
-	// Capacity: 3
-	// Exceeded: queue is full
-	// Dequeued: A
-	// Resized: <nil>
-	// Length: 3
-	// Capacity: 4
-	// Dequeued: B
-	// Dequeued: C
-	// Dequeued: D
-	// Dequeued: E
+	// Length after enqueueing 3 items: 3
+	// Capacity after enqueueing 3 items: 3
+	// TryEnqueue when full: queue is full
+	// Dequeued item: A
+	// Resize result: <nil>
+	// Capacity after resize: 5
+	// Dequeued item: B
+	// Dequeued item: C
+	// Dequeued item: D
+	// Dequeued item: E
+	// Dequeued item: F
+	// Concurrent dequeued item: G0
+	// Concurrent dequeued item: G1
+	// Concurrent dequeued item: G2
+	// Concurrent dequeued item: G3
+	// Concurrent dequeued item: G4
+	// TryEnqueue after close: queue is closed
+	// TryDequeue after close: queue is closed
+	// Resize after close: queue is closed
 }
