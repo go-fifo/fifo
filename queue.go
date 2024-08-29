@@ -57,8 +57,8 @@ func (q *Queue[T]) Cap() int {
 	return q.cap
 }
 
-// Enqueue adds an item to the end of the queue. If the queue is full, ErrQueueFull is returned.
-func (q *Queue[T]) Enqueue(item T) error {
+// TryEnqueue attempts to add an item to the end of the queue. If the queue is full, ErrQueueFull is returned immediately.
+func (q *Queue[T]) TryEnqueue(item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -78,8 +78,8 @@ func (q *Queue[T]) Enqueue(item T) error {
 	return nil
 }
 
-// BlockingEnqueue adds an item to the end of the queue. If the queue is full, the calling goroutine is blocked until space becomes available.
-func (q *Queue[T]) BlockingEnqueue(item T) error {
+// Enqueue adds an item to the end of the queue. If the queue is full, the calling goroutine is blocked until space becomes available.
+func (q *Queue[T]) Enqueue(item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -99,8 +99,8 @@ func (q *Queue[T]) BlockingEnqueue(item T) error {
 	return nil
 }
 
-// Dequeue removes and returns the item at the front of the queue. If the queue is empty, ErrQueueEmpty is returned.
-func (q *Queue[T]) Dequeue() (T, error) {
+// TryDequeue attempts to remove and returns the item at the front of the queue. If the queue is empty, ErrQueueEmpty is returned immediately.
+func (q *Queue[T]) TryDequeue() (T, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -121,8 +121,8 @@ func (q *Queue[T]) Dequeue() (T, error) {
 	return item, nil
 }
 
-// BlockingDequeue removes and returns the item at the front of the queue. If the queue is empty, the calling goroutine is blocked until an item becomes available.
-func (q *Queue[T]) BlockingDequeue() (T, error) {
+// Dequeue removes and returns the item at the front of the queue. If the queue is empty, the calling goroutine is blocked until an item becomes available.
+func (q *Queue[T]) Dequeue() (T, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
