@@ -118,84 +118,85 @@ Here's a complete example demonstrating the usage of the `fifo` package:
 package main
 
 import (
-    "fmt"
-    "sync"
-    "time"
-    "gopkg.in/fifo.v0"
+	"fmt"
+	"sync"
+	"time"
+
+	"gopkg.in/fifo.v0"
 )
 
 func main() {
-    q := fifo.New[string](3)
+	q := fifo.New[string](3)
 
-    // Enqueue items
-    q.TryEnqueue("A")
-    q.TryEnqueue("B")
-    q.TryEnqueue("C")
+	// Enqueue items
+	q.TryEnqueue("A")
+	q.TryEnqueue("B")
+	q.TryEnqueue("C")
 
-    fmt.Println("Length after enqueueing 3 items:", q.Len())
-    fmt.Println("Capacity after enqueueing 3 items:", q.Cap())
+	fmt.Println("Length after enqueueing 3 items:", q.Len())
+	fmt.Println("Capacity after enqueueing 3 items:", q.Cap())
 
-    // Try to enqueue when full
-    err := q.TryEnqueue("D")
-    fmt.Println("TryEnqueue when full:", err)
+	// Try to enqueue when full
+	err := q.TryEnqueue("D")
+	fmt.Println("TryEnqueue when full:", err)
 
-    // Dequeue an item
-    item, _ := q.TryDequeue()
-    fmt.Println("Dequeued item:", item)
+	// Dequeue an item
+	item, _ := q.TryDequeue()
+	fmt.Println("Dequeued item:", item)
 
-    // Enqueue another item
-    q.TryEnqueue("D")
+	// Enqueue another item
+	q.TryEnqueue("D")
 
-    // Resize the queue
-    err = q.Resize(5)
-    fmt.Println("Resize result:", err)
-    fmt.Println("Capacity after resize:", q.Cap())
+	// Resize the queue
+	err = q.Resize(5)
+	fmt.Println("Resize result:", err)
+	fmt.Println("Capacity after resize:", q.Cap())
 
-    // Enqueue more items
-    q.TryEnqueue("E")
-    q.TryEnqueue("F")
+	// Enqueue more items
+	q.TryEnqueue("E")
+	q.TryEnqueue("F")
 
-    // Dequeue all items
-    for q.Len() > 0 {
-        item, _ := q.TryDequeue()
-        fmt.Println("Dequeued item:", item)
-    }
+	// Dequeue all items
+	for q.Len() > 0 {
+		item, _ := q.TryDequeue()
+		fmt.Println("Dequeued item:", item)
+	}
 
-    // Concurrent operations
-    var wg sync.WaitGroup
-    wg.Add(2)
+	// Concurrent operations
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-    go func() {
-        defer wg.Done()
-        for i := 0; i < 5; i++ {
-            q.Enqueue(fmt.Sprintf("G%d", i))
-            time.Sleep(10 * time.Millisecond)
-        }
-    }()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			q.Enqueue(fmt.Sprintf("G%d", i))
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
 
-    go func() {
-        defer wg.Done()
-        for i := 0; i < 5; i++ {
-            item, _ := q.Dequeue()
-            fmt.Println("Concurrent dequeued item:", item)
-            time.Sleep(15 * time.Millisecond)
-        }
-    }()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			item, _ := q.Dequeue()
+			fmt.Println("Concurrent dequeued item:", item)
+			time.Sleep(15 * time.Millisecond)
+		}
+	}()
 
-    wg.Wait()
+	wg.Wait()
 
-    // Close the queue
-    q.Close()
+	// Close the queue
+	q.Close()
 
-    // Try operations after closing
-    err = q.TryEnqueue("H")
-    fmt.Println("TryEnqueue after close:", err)
+	// Try operations after closing
+	err = q.TryEnqueue("H")
+	fmt.Println("TryEnqueue after close:", err)
 
-    _, err = q.TryDequeue()
-    fmt.Println("TryDequeue after close:", err)
+	_, err = q.TryDequeue()
+	fmt.Println("TryDequeue after close:", err)
 
-    err = q.Resize(10)
-    fmt.Println("Resize after close:", err)
+	err = q.Resize(10)
+	fmt.Println("Resize after close:", err)
 }
 ```
 
