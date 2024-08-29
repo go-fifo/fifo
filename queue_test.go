@@ -352,7 +352,7 @@ func TestQueue_ConcurrentBlockingEnqueueDequeue(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			if err := q.BlockingEnqueue(n); err != nil {
+			if err := q.Enqueue(n); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}(i)
@@ -363,7 +363,7 @@ func TestQueue_ConcurrentBlockingEnqueueDequeue(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := q.BlockingDequeue(); err != nil {
+			if _, err := q.Dequeue(); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}()
@@ -418,7 +418,7 @@ func TestQueue_Blocking(t *testing.T) {
 		q.TryEnqueue(1)
 		t.Logf("just enqueued 1")
 
-		q.BlockingEnqueue(2)
+		q.Enqueue(2)
 		t.Logf("blocking enqueued 2")
 	}()
 
@@ -430,7 +430,7 @@ func TestQueue_Blocking(t *testing.T) {
 		item, err := q.TryDequeue()
 		t.Logf("just dequeued %d -- %v", item, err)
 
-		item, _ = q.BlockingDequeue()
+		item, _ = q.Dequeue()
 		t.Logf("blocking dequeued %d", item)
 	}()
 
@@ -500,7 +500,7 @@ func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 			defer wg.Done()
 			//t.Logf("blocking dequeued %d", idx)
 			//fmt.Printf("blocking dequeued %d\n", idx)
-			q.BlockingDequeue()
+			q.Dequeue()
 		}(i)
 	}
 
@@ -511,7 +511,7 @@ func TestQueue_BlockingDequeueEnqueue(t *testing.T) {
 			defer wg.Done()
 			//t.Logf("blocking enqueued %d", idx)
 			//fmt.Printf("blocking enqueued %d\n", idx)
-			q.BlockingEnqueue(idx)
+			q.Enqueue(idx)
 		}(i)
 	}
 
@@ -529,7 +529,7 @@ func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 			defer wg.Done()
 			//t.Logf("blocking enqueued %d", idx)
 			//fmt.Printf("blocking enqueued %d\n", idx)
-			q.BlockingEnqueue(idx)
+			q.Enqueue(idx)
 		}(i)
 	}
 
@@ -540,7 +540,7 @@ func TestQueue_BlockingEnqueueDequeue(t *testing.T) {
 			defer wg.Done()
 			//t.Logf("blocking dequeued %d", idx)
 			//fmt.Printf("blocking dequeued %d\n", idx)
-			q.BlockingDequeue()
+			q.Dequeue()
 		}(i)
 	}
 
@@ -556,7 +556,7 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			q.BlockingEnqueue(idx)
+			q.Enqueue(idx)
 		}(i)
 	}
 
@@ -615,7 +615,7 @@ func TestQueue_BlockingEnqueueAfterClose(t *testing.T) {
 	q := New[int](3)
 	_ = q.Close()
 
-	err := q.BlockingEnqueue(1)
+	err := q.Enqueue(1)
 	if err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
@@ -625,7 +625,7 @@ func TestQueue_BlockingDequeueAfterClose(t *testing.T) {
 	q := New[int](3)
 	_ = q.Close()
 
-	_, err := q.BlockingDequeue()
+	_, err := q.Dequeue()
 	if err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
@@ -693,7 +693,7 @@ func TestQueue_ConcurrentBlockingEnqueueAndClose(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := q.BlockingEnqueue(2)
+		err := q.Enqueue(2)
 		if err != nil && err != ErrQueueClosed {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -719,7 +719,7 @@ func TestQueue_ConcurrentBlockingDequeueAndClose(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		_, err := q.BlockingDequeue()
+		_, err := q.Dequeue()
 		if err != nil && err != ErrQueueClosed {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -757,7 +757,7 @@ func TestQueue_CloseUnblocksBlockingEnqueue(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		err := q.BlockingEnqueue(2)
+		err := q.Enqueue(2)
 		if err != ErrQueueClosed {
 			t.Errorf("expected ErrQueueClosed, got: %v", err)
 		}
@@ -771,7 +771,7 @@ func TestQueue_CloseUnblocksBlockingEnqueue(t *testing.T) {
 	case <-done:
 		// Test passed
 	case <-time.After(1 * time.Second):
-		t.Fatal("BlockingEnqueue was not unblocked by Close")
+		t.Fatal("Enqueue was not unblocked by Close")
 	}
 }
 
@@ -780,7 +780,7 @@ func TestQueue_CloseUnblocksBlockingDequeue(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		_, err := q.BlockingDequeue()
+		_, err := q.Dequeue()
 		if err != ErrQueueClosed {
 			t.Errorf("expected ErrQueueClosed, got: %v", err)
 		}
@@ -794,7 +794,7 @@ func TestQueue_CloseUnblocksBlockingDequeue(t *testing.T) {
 	case <-done:
 		// Test passed
 	case <-time.After(1 * time.Second):
-		t.Fatal("BlockingDequeue was not unblocked by Close")
+		t.Fatal("Dequeue was not unblocked by Close")
 	}
 }
 
@@ -824,26 +824,26 @@ func TestQueue_MassConcurrentBlocking(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	// Concurrent BlockingEnqueue
+	// Concurrent Enqueue
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(start int) {
 			defer wg.Done()
 			for j := start; j < start+numItems; j++ {
-				if err := q.BlockingEnqueue(j); err != nil {
+				if err := q.Enqueue(j); err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			}
 		}(i * numItems)
 	}
 
-	// Concurrent BlockingDequeue
+	// Concurrent Dequeue
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for j := 0; j < numItems; j++ {
-				_, err := q.BlockingDequeue()
+				_, err := q.Dequeue()
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -862,12 +862,12 @@ func TestQueue_SmallConcurrentBlocking(t *testing.T) {
 	inputs := []int{}
 	outputs := []int{}
 
-	// Concurrent BlockingEnqueue
+	// Concurrent Enqueue
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for i := 1; i <= num; i++ {
-			if err := q.BlockingEnqueue(i); err != nil && err != ErrQueueClosed {
+			if err := q.Enqueue(i); err != nil && err != ErrQueueClosed {
 				t.Errorf("unexpected error: %v", err)
 			} else {
 				mu.Lock()
@@ -878,12 +878,12 @@ func TestQueue_SmallConcurrentBlocking(t *testing.T) {
 		}
 	}()
 
-	// Concurrent BlockingDequeue
+	// Concurrent Dequeue
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for i := 1; i <= num; i++ {
-			val, err := q.BlockingDequeue()
+			val, err := q.Dequeue()
 			if err != nil && err != ErrQueueClosed {
 				t.Errorf("unexpected error: %v", err)
 			} else {
@@ -918,7 +918,7 @@ func TestQueue_OneCapacity(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(10 * time.Millisecond)
-		err := q.BlockingEnqueue(1)
+		err := q.Enqueue(1)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -927,7 +927,7 @@ func TestQueue_OneCapacity(t *testing.T) {
 	// TryDequeue in the main goroutine
 	go func() {
 		defer wg.Done()
-		val, err := q.BlockingDequeue()
+		val, err := q.Dequeue()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
