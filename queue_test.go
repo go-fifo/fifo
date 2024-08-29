@@ -11,7 +11,7 @@ import (
 func assertDequeueList[T any](t *testing.T, q *Queue[T], expected []T, compare func(a, b T) bool) {
 	t.Helper() // Marks this function as a test helper function
 	for _, exp := range expected {
-		item, err := q.Dequeue()
+		item, err := q.TryDequeue()
 		if err != nil || !compare(item, exp) {
 			t.Fatalf("expected %v, got: %v, err: %v", exp, item, err)
 		}
@@ -22,30 +22,30 @@ func intCompare(a, b int) bool {
 	return a == b
 }
 
-func TestQueue_EnqueueDequeue(t *testing.T) {
+func TestQueue_TryEnqueueDequeue(t *testing.T) {
 	q := New[int](3)
 
-	// Test Enqueue
-	if err := q.Enqueue(1); err != nil {
+	// Test TryEnqueue
+	if err := q.TryEnqueue(1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := q.Enqueue(2); err != nil {
+	if err := q.TryEnqueue(2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := q.Enqueue(3); err != nil {
+	if err := q.TryEnqueue(3); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Test Enqueue on full queue
-	if err := q.Enqueue(4); err != ErrQueueFull {
+	// Test TryEnqueue on full queue
+	if err := q.TryEnqueue(4); err != ErrQueueFull {
 		t.Fatalf("expected ErrQueueFull, got: %v", err)
 	}
 
-	// Test Dequeue
+	// Test TryDequeue
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
-	// Test Dequeue on empty queue
-	_, err := q.Dequeue()
+	// Test TryDequeue on empty queue
+	_, err := q.TryDequeue()
 	if err != ErrQueueEmpty {
 		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
 	}
@@ -61,8 +61,8 @@ func TestQueue_LenCap(t *testing.T) {
 		t.Fatalf("expected cap 3, got: %d", q.Cap())
 	}
 
-	q.Enqueue(1)
-	q.Enqueue(2)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
 
 	if q.Len() != 2 {
 		t.Fatalf("expected len 2, got: %d", q.Len())
@@ -71,9 +71,9 @@ func TestQueue_LenCap(t *testing.T) {
 
 func TestQueue_ResizeUp(t *testing.T) {
 	q := New[int](3)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	if err := q.Resize(5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -87,11 +87,11 @@ func TestQueue_ResizeUp(t *testing.T) {
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
 	// Check new data works
-	q.Enqueue(4)
-	q.Enqueue(5)
-	q.Enqueue(6)
-	q.Enqueue(7)
-	q.Enqueue(8)
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
+	q.TryEnqueue(6)
+	q.TryEnqueue(7)
+	q.TryEnqueue(8)
 
 	assertDequeueList(t, q, []int{4, 5, 6, 7, 8}, intCompare)
 }
@@ -100,16 +100,16 @@ func TestQueue_ResizeUp2(t *testing.T) {
 	q := New[int](3)
 
 	// Fill the queue
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
-	// Dequeue two items
+	// TryDequeue two items
 	assertDequeueList(t, q, []int{1, 2}, intCompare)
 
-	// Enqueue two more items, causing wraparound
-	q.Enqueue(4)
-	q.Enqueue(5)
+	// TryEnqueue two more items, causing wraparound
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
 
 	// Resize the queue
 	if err := q.Resize(5); err != nil {
@@ -122,9 +122,9 @@ func TestQueue_ResizeUp2(t *testing.T) {
 
 func TestQueue_ResizeDown(t *testing.T) {
 	q := New[int](5)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	if err := q.Resize(3); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -138,13 +138,13 @@ func TestQueue_ResizeDown(t *testing.T) {
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
 	// Check new data works
-	q.Enqueue(4)
-	q.Enqueue(5)
-	q.Enqueue(6)
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
+	q.TryEnqueue(6)
 	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
 
 	// Ensure it's empty
-	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+	if _, err := q.TryDequeue(); err != ErrQueueEmpty {
 		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
 	}
 	if q.Len() != 0 {
@@ -154,9 +154,9 @@ func TestQueue_ResizeDown(t *testing.T) {
 
 func TestQueue_ResizeDown2(t *testing.T) {
 	q := New[int](5)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	if err := q.Resize(4); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -170,23 +170,23 @@ func TestQueue_ResizeDown2(t *testing.T) {
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
 	// Check new data works
-	q.Enqueue(4)
-	q.Enqueue(5)
-	q.Enqueue(6)
-	q.Enqueue(7)
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
+	q.TryEnqueue(6)
+	q.TryEnqueue(7)
 	assertDequeueList(t, q, []int{4, 5, 6}, intCompare)
 
 	// Check more data works
-	q.Enqueue(8)
-	q.Enqueue(9)
-	q.Enqueue(10)
-	if err := q.Enqueue(11); err != ErrQueueFull {
+	q.TryEnqueue(8)
+	q.TryEnqueue(9)
+	q.TryEnqueue(10)
+	if err := q.TryEnqueue(11); err != ErrQueueFull {
 		t.Fatalf("expected ErrQueueFull, got: %v", err)
 	}
 	assertDequeueList(t, q, []int{7, 8, 9, 10}, intCompare)
 
 	// Ensure it's empty
-	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+	if _, err := q.TryDequeue(); err != ErrQueueEmpty {
 		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
 	}
 	if q.Len() != 0 {
@@ -198,17 +198,17 @@ func TestQueue_ResizeDown3(t *testing.T) {
 	q := New[int](5)
 
 	// Fill the queue
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
-	q.Enqueue(4)
-	q.Enqueue(5)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
 
-	// Dequeue two items
+	// TryDequeue two items
 	assertDequeueList(t, q, []int{1, 2}, intCompare)
 
-	// Enqueue two more items, causing wraparound
-	q.Enqueue(6)
+	// TryEnqueue two more items, causing wraparound
+	q.TryEnqueue(6)
 
 	// Resize the queue down
 	if err := q.Resize(4); err != nil {
@@ -219,7 +219,7 @@ func TestQueue_ResizeDown3(t *testing.T) {
 	assertDequeueList(t, q, []int{3, 4, 5, 6}, intCompare)
 
 	// Ensure it's empty
-	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+	if _, err := q.TryDequeue(); err != ErrQueueEmpty {
 		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
 	}
 	if q.Len() != 0 {
@@ -229,9 +229,9 @@ func TestQueue_ResizeDown3(t *testing.T) {
 
 func TestQueue_ResizeSameSize(t *testing.T) {
 	q := New[int](3)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	if err := q.Resize(3); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -247,9 +247,9 @@ func TestQueue_ResizeSameSize(t *testing.T) {
 
 func TestQueue_ResizeTooSmall(t *testing.T) {
 	q := New[int](5)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	err := q.Resize(2)
 	if err != nil {
@@ -267,9 +267,9 @@ func TestQueue_ResizeTooSmall(t *testing.T) {
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
 	// Check new data works
-	q.Enqueue(4)
-	q.Enqueue(5)
-	if err := q.Enqueue(6); err != ErrQueueFull {
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
+	if err := q.TryEnqueue(6); err != ErrQueueFull {
 		t.Fatalf("expected ErrQueueFull, got: %v", err)
 	}
 	assertDequeueList(t, q, []int{4, 5}, intCompare)
@@ -280,16 +280,16 @@ func TestQueue_ResizeTooSmall(t *testing.T) {
 	}
 
 	// Check more data works
-	q.Enqueue(8)
-	q.Enqueue(9)
-	q.Enqueue(10)
-	if err := q.Enqueue(11); err != ErrQueueFull {
+	q.TryEnqueue(8)
+	q.TryEnqueue(9)
+	q.TryEnqueue(10)
+	if err := q.TryEnqueue(11); err != ErrQueueFull {
 		t.Fatalf("expected ErrQueueFull, got: %v", err)
 	}
 	assertDequeueList(t, q, []int{8, 9, 10}, intCompare)
 
 	// Ensure it's empty
-	if _, err := q.Dequeue(); err != ErrQueueEmpty {
+	if _, err := q.TryDequeue(); err != ErrQueueEmpty {
 		t.Fatalf("expected ErrQueueEmpty, got: %v", err)
 	}
 	if q.Len() != 0 {
@@ -311,7 +311,38 @@ func TestQueue_ResizeEmptyQueue(t *testing.T) {
 	}
 }
 
-func TestQueue_ConcurrentEnqueueDequeue(t *testing.T) {
+func TestQueue_ConcurrentTryEnqueueDequeue(t *testing.T) {
+	q := New[int](100)
+
+	var wg sync.WaitGroup
+
+	// Concurrent TryEnqueue
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			if err := q.TryEnqueue(n); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}(i)
+	}
+
+	// Concurrent TryDequeue
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := q.TryDequeue()
+			if err != nil && err != ErrQueueEmpty {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestQueue_ConcurrentBlockingEnqueueDequeue(t *testing.T) {
 	q := New[int](100)
 
 	var wg sync.WaitGroup
@@ -321,7 +352,7 @@ func TestQueue_ConcurrentEnqueueDequeue(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			if err := q.Enqueue(n); err != nil {
+			if err := q.BlockingEnqueue(n); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}(i)
@@ -332,8 +363,7 @@ func TestQueue_ConcurrentEnqueueDequeue(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := q.Dequeue()
-			if err != nil && err != ErrQueueEmpty {
+			if _, err := q.BlockingDequeue(); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}()
@@ -346,7 +376,7 @@ func TestQueue_ConcurrentResize(t *testing.T) {
 	q := New[int](10)
 
 	for i := 0; i < 10; i++ {
-		q.Enqueue(i)
+		q.TryEnqueue(i)
 	}
 
 	var wg sync.WaitGroup
@@ -369,7 +399,7 @@ func TestQueue_ConcurrentResize(t *testing.T) {
 
 	// Ensure no data loss
 	for i := 0; i < 10; i++ {
-		item, err := q.Dequeue()
+		item, err := q.TryDequeue()
 		if err != nil || item != i {
 			t.Fatalf("expected %d, got: %v, err: %v", i, item, err)
 		}
@@ -385,7 +415,7 @@ func TestQueue_Blocking(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		q.Enqueue(1)
+		q.TryEnqueue(1)
 		t.Logf("just enqueued 1")
 
 		q.BlockingEnqueue(2)
@@ -397,7 +427,7 @@ func TestQueue_Blocking(t *testing.T) {
 		defer wg.Done()
 
 		time.Sleep(100 * time.Millisecond)
-		item, err := q.Dequeue()
+		item, err := q.TryDequeue()
 		t.Logf("just dequeued %d -- %v", item, err)
 
 		item, _ = q.BlockingDequeue()
@@ -407,7 +437,7 @@ func TestQueue_Blocking(t *testing.T) {
 	wg.Wait()
 }
 
-func TestQueue_EnqueueLen(t *testing.T) {
+func TestQueue_TryEnqueueLen(t *testing.T) {
 	q := New[int](5)
 
 	var wg sync.WaitGroup
@@ -425,17 +455,17 @@ func TestQueue_EnqueueLen(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			q.Enqueue(i)
+			q.TryEnqueue(i)
 		}(i)
 	}
 
 	wg.Wait()
 }
 
-func TestQueue_DequeueLen(t *testing.T) {
+func TestQueue_TryDequeueLen(t *testing.T) {
 	q := New[int](5)
 	for i := 1; i <= 6; i++ {
-		q.Enqueue(i)
+		q.TryEnqueue(i)
 	}
 
 	var wg sync.WaitGroup
@@ -453,7 +483,7 @@ func TestQueue_DequeueLen(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			q.Dequeue()
+			q.TryDequeue()
 		}(i)
 	}
 	wg.Wait()
@@ -546,9 +576,9 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 
 	seen := make(map[int]bool)
 	for i := 0; i < times; i++ {
-		item, err := q.Dequeue()
+		item, err := q.TryDequeue()
 		if err != nil {
-			t.Errorf("Unexpected error during Dequeue: %v", err)
+			t.Errorf("Unexpected error during TryDequeue: %v", err)
 		}
 		if seen[item] {
 			t.Errorf("Duplicate item found: %d", item)
@@ -561,21 +591,21 @@ func TestQueue_BlockingEnqueueResize(t *testing.T) {
 	}
 }
 
-func TestQueue_EnqueueAfterClose(t *testing.T) {
+func TestQueue_TryEnqueueAfterClose(t *testing.T) {
 	q := New[int](3)
 	_ = q.Close()
 
-	err := q.Enqueue(1)
+	err := q.TryEnqueue(1)
 	if err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
 }
 
-func TestQueue_DequeueAfterClose(t *testing.T) {
+func TestQueue_TryDequeueAfterClose(t *testing.T) {
 	q := New[int](3)
 	_ = q.Close()
 
-	_, err := q.Dequeue()
+	_, err := q.TryDequeue()
 	if err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
@@ -601,7 +631,7 @@ func TestQueue_BlockingDequeueAfterClose(t *testing.T) {
 	}
 }
 
-func TestQueue_ConcurrentEnqueueAndClose(t *testing.T) {
+func TestQueue_ConcurrentTryEnqueueAndClose(t *testing.T) {
 	q := New[int](3)
 
 	var wg sync.WaitGroup
@@ -609,7 +639,7 @@ func TestQueue_ConcurrentEnqueueAndClose(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := q.Enqueue(1)
+		err := q.TryEnqueue(1)
 		if err != nil && err != ErrQueueClosed {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -627,16 +657,16 @@ func TestQueue_ConcurrentEnqueueAndClose(t *testing.T) {
 	wg.Wait()
 }
 
-func TestQueue_ConcurrentDequeueAndClose(t *testing.T) {
+func TestQueue_ConcurrentTryDequeueAndClose(t *testing.T) {
 	q := New[int](3)
-	q.Enqueue(1)
+	q.TryEnqueue(1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
-		_, err := q.Dequeue()
+		_, err := q.TryDequeue()
 		if err != nil && err != ErrQueueClosed {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -656,7 +686,7 @@ func TestQueue_ConcurrentDequeueAndClose(t *testing.T) {
 
 func TestQueue_ConcurrentBlockingEnqueueAndClose(t *testing.T) {
 	q := New[int](1)
-	q.Enqueue(1)
+	q.TryEnqueue(1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -723,7 +753,7 @@ func TestQueue_Close(t *testing.T) {
 
 func TestQueue_CloseUnblocksBlockingEnqueue(t *testing.T) {
 	q := New[int](1)
-	q.Enqueue(1)
+	q.TryEnqueue(1)
 
 	done := make(chan struct{})
 	go func() {
@@ -772,18 +802,18 @@ func TestQueue_EnqueueDequeueWithWraparound(t *testing.T) {
 	q := New[int](3)
 
 	// Fill the queue
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
-	// Dequeue two items
+	// TryDequeue two items
 	assertDequeueList(t, q, []int{1, 2}, intCompare)
 
-	// Enqueue two more items, causing wraparound
-	q.Enqueue(4)
-	q.Enqueue(5)
+	// TryEnqueue two more items, causing wraparound
+	q.TryEnqueue(4)
+	q.TryEnqueue(5)
 
-	// Dequeue all items and check order
+	// TryDequeue all items and check order
 	assertDequeueList(t, q, []int{3, 4, 5}, intCompare)
 }
 
@@ -884,7 +914,7 @@ func TestQueue_OneCapacity(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Enqueue in a separate goroutine
+	// TryEnqueue in a separate goroutine
 	go func() {
 		defer wg.Done()
 		time.Sleep(10 * time.Millisecond)
@@ -894,7 +924,7 @@ func TestQueue_OneCapacity(t *testing.T) {
 		}
 	}()
 
-	// Dequeue in the main goroutine
+	// TryDequeue in the main goroutine
 	go func() {
 		defer wg.Done()
 		val, err := q.BlockingDequeue()
@@ -935,9 +965,9 @@ func TestQueue_ResizeToNonPositiveCapacity(t *testing.T) {
 
 func TestQueue_ResizeWhenClosed(t *testing.T) {
 	q := New[int](3)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	// Close the queue
 	q.Close()
@@ -950,9 +980,9 @@ func TestQueue_ResizeWhenClosed(t *testing.T) {
 
 func TestQueue_OperationsAfterClosed(t *testing.T) {
 	q := New[int](3)
-	q.Enqueue(1)
-	q.Enqueue(2)
-	q.Enqueue(3)
+	q.TryEnqueue(1)
+	q.TryEnqueue(2)
+	q.TryEnqueue(3)
 
 	// Close the queue
 	q.Close()
@@ -961,12 +991,12 @@ func TestQueue_OperationsAfterClosed(t *testing.T) {
 	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
 
 	// Ensure it's empty
-	if _, err := q.Dequeue(); err != ErrQueueClosed {
+	if _, err := q.TryDequeue(); err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
 
 	// Can't add more items
-	if err := q.Enqueue(4); err != ErrQueueClosed {
+	if err := q.TryEnqueue(4); err != ErrQueueClosed {
 		t.Fatalf("expected ErrQueueClosed, got: %v", err)
 	}
 
@@ -984,26 +1014,26 @@ func TestQueue_OperationsAfterClosed(t *testing.T) {
 func ExampleQueue() {
 	q := New[string](3)
 
-	q.Enqueue("A")
-	q.Enqueue("B")
-	q.Enqueue("C")
+	q.TryEnqueue("A")
+	q.TryEnqueue("B")
+	q.TryEnqueue("C")
 
 	fmt.Println("Length:", q.Len())
 	fmt.Println("Capacity:", q.Cap())
 
-	fmt.Println("Exceeded:", q.Enqueue("X"))
+	fmt.Println("Exceeded:", q.TryEnqueue("X"))
 
-	item, _ := q.Dequeue()
+	item, _ := q.TryDequeue()
 	fmt.Println("Dequeued:", item)
 
-	q.Enqueue("D")
+	q.TryEnqueue("D")
 	fmt.Println("Resized:", q.Resize(4))
 	fmt.Println("Length:", q.Len())
 	fmt.Println("Capacity:", q.Cap())
-	q.Enqueue("E")
+	q.TryEnqueue("E")
 
 	for q.Len() > 0 {
-		item, _ := q.Dequeue()
+		item, _ := q.TryDequeue()
 		fmt.Println("Dequeued:", item)
 	}
 
