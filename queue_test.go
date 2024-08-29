@@ -948,6 +948,39 @@ func TestQueue_ResizeWhenClosed(t *testing.T) {
 	}
 }
 
+func TestQueue_OperationsAfterClosed(t *testing.T) {
+	q := New[int](3)
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+
+	// Close the queue
+	q.Close()
+
+	// Ensure no data loss
+	assertDequeueList(t, q, []int{1, 2, 3}, intCompare)
+
+	// Ensure it's empty
+	if _, err := q.Dequeue(); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't add more items
+	if err := q.Enqueue(4); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't resize
+	if err := q.Resize(5); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+
+	// Can't close again
+	if err := q.Close(); err != ErrQueueClosed {
+		t.Fatalf("expected ErrQueueClosed, got: %v", err)
+	}
+}
+
 func ExampleQueue() {
 	q := New[string](3)
 
